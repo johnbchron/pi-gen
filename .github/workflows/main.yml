@@ -74,7 +74,7 @@ jobs:
           locale: "en_US.UTF-8"
           keyboard-keymap: "us"
           keyboard-layout: "English (US)"
-          timezone: "Europe/Chicago"
+          timezone: "America/Chicago"
           
           # Convenience Options
           #enable-ssh: 0
