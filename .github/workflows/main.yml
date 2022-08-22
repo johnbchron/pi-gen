@@ -1,0 +1,102 @@
+
+name: build-image
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  pi-gen-upload-image:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          # set up initial stage environment
+          mkdir -p custom-stage/00-install-podman &&
+          mkdir -p custom-stage/01-pull-frozen-image &&
+          # add package deps
+          echo "podman jq" > custom-stage/00-install-podman/00-packages &&
+
+          # add prerun script to copy over previous build dir
+          {
+          cat > custom-stage/prerun.sh <<-EOF
+          #!/bin/bash -e
+          if [ ! -d "\${ROOTFS_DIR}" ]; then
+            copy_previous
+          fi
+          EOF
+          } &&
+
+          # make the prerun script executable
+          chmod +x custom-stage/prerun.sh &&
+
+          # add script to pull the frozen image and setup the first-boot script
+          {
+          cat > custom-stage/01-pull-frozen-image/00-run-chroot.sh <<-EOF
+          #!/bin/bash
+
+          mkdir /var/images/
+          curl -L https://raw.githubusercontent.com/moby/moby/master/contrib/download-frozen-image-v2.sh > download-frozen-image-v2
+          chmod +x download-frozen-image-v2
+
+          # change image here
+          ./download-frozen-image-v2 /var/images/ athombv/homey-app-runner:latest@sha256:bac71370a52041d7d4be18301091869ecda16ff64de53eca998f93c2a8aa4077
+          
+          # # add first-boot script to unfreeze the image
+          # cat > /home/pi/.unfreeze-image <<-EOOF
+          # #!/bin/bash
+          # echo "restoring image 'homey-app-runner'"
+          # tar -cC '/var/images/' . | podman load &> /dev/null
+          # rm /home/pi/.unfreeze-image
+          # EOOF
+          # chmod +x /home/pi/.unfreeze-image
+          # chown pi /home/pi/.unfreeze-image
+          # echo "/home/pi/.unfreeze-image" >> /home/pi/.bashrc
+
+          podman load -i /var/images/athombv-homey-app-runner-latest.tar
+
+          EOF
+          } &&
+          # make the image pulling script runnable
+          chmod +x custom-stage/01-pull-frozen-image/00-run-chroot.sh
+
+      - uses: usimd/pi-gen-action@v1
+        id: build
+        with:
+          # Set a new image name
+          image-name: "podman-custom"
+
+          # Build Settings
+          use-qcow2: 1
+          verbose-output: false
+          stage-list: stage0 stage1 stage2 ./custom-stage
+
+          # Locale Settings
+          #locale: "en_GB.UTF-8"
+          #keyboard-keymap: "gb"
+          #keyboard-layout: "English (UK)"
+          #timezone: "Europe/London"
+          
+          # Convenience Options
+          #enable-ssh: 0
+          #hostname: "raspberrypi"
+          #wpa-country: ""
+          #wpa-essid: ""
+          #wpa-password: ""
+
+          # These lines explicitly set the login credentials, and are required.
+          # The password can be changed but the username must be `pi` for the
+          # above scripting to work
+          disable-first-boot-user-rename: 1
+          username: "pi"
+          password: "raspberry"
+
+          # It is possible to change the debian release the image is built
+          # against, though I haven't tested this with the custom changes
+          # Valid options are: jessie, stretch, buster, bullseye, testing
+          #release: "bullseye"
+
+      - uses: actions/upload-artifact@v3
+        id: upload
+        with:
+          name: custom-image
+          path: ${{ steps.build.outputs.image-path }}
