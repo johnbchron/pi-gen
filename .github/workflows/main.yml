@@ -39,7 +39,9 @@ jobs:
           chmod +x download-frozen-image-v2
 
           # change image here
-          ./download-frozen-image-v2 /var/images/ athombv/homey-app-runner:latest@sha256:bac71370a52041d7d4be18301091869ecda16ff64de53eca998f93c2a8aa4077
+          ./download-frozen-image-v2 frozen_image athombv/homey-app-runner:latest@sha256:bac71370a52041d7d4be18301091869ecda16ff64de53eca998f93c2a8aa4077
+          tar -cf frozen_image frozen_image.tar
+          podman load -i frozen_image.tar
           
           # # add first-boot script to unfreeze the image
           # cat > /home/pi/.unfreeze-image <<-EOOF
@@ -51,8 +53,6 @@ jobs:
           # chmod +x /home/pi/.unfreeze-image
           # chown pi /home/pi/.unfreeze-image
           # echo "/home/pi/.unfreeze-image" >> /home/pi/.bashrc
-
-          podman load -i /var/images/athombv-homey-app-runner-latest.tar
 
           EOF
           } &&
